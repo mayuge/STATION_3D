@@ -54,7 +54,7 @@
   <script src="https://unpkg.com/deck.gl@9.0.38/dist.min.js"></script>
   <script>
     const WALKING_SPEED_METERS_PER_MINUTE = 80;
-    const HEIGHT_PER_TRAIN_METERS = 30;
+    
     const map = new maplibregl.Map({
       container: "map",
       style: "https://raw.githubusercontent.com/mayuge/OpenSourceStyle/refs/heads/main/style.json",
@@ -74,7 +74,7 @@
     const distanceLabel = document.getElementById("distance");
 
     function totalTrains(properties) {
-      return ["着数1", "発数1", "着数2", "発数2"]
+      return ["両方向発着計"]
         .reduce((sum, key) => sum + (Number(properties[key]) || 0), 0);
     }
 
@@ -109,7 +109,7 @@
           radius,
           getPosition: d => d.position,
           // 高さだけが運行本数を表す。徒歩圏スライダーでは変化しない。
-          getElevation: d => Math.max(12, d.frequency * HEIGHT_PER_TRAIN_METERS),
+          getElevation: d => d.frequency,
           getFillColor: d => columnColor(d.frequency),
           getLineColor: [120, 45, 20, 100],
           lineWidthMinPixels: 1,
@@ -132,7 +132,7 @@
       renderColumns();
     });
 
-    fetch("./unkohonsu2026_rosen_eki.geojson")
+    fetch("./unkohonsu2026_eki.geojson")
       .then(response => {
         if (!response.ok) throw new Error(`GeoJSON の読み込みに失敗しました (${response.status})`);
         return response.json();
