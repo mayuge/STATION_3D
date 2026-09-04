@@ -51,7 +51,10 @@
   <script src="https://unpkg.com/deck.gl@9.0.38/dist.min.js"></script>
   <script>
     const WALKING_SPEED_METERS_PER_MINUTE = 80;
-    const HEIGHT_PER_TRAIN_METERS = 6;
+    const HEIGHT_PER_TRAIN_METERS = 15;
+    const TOKYO_CENTER = [139.7671, 35.6812]; // 東京駅
+    const CENTRAL_TOKYO_RADIUS_METERS = 25000;
+    const CENTRAL_TOKYO_HEIGHT_MULTIPLIER = 1.25;
     const map = new maplibregl.Map({
       container: "map",
       style: "https://raw.githubusercontent.com/mayuge/OpenSourceStyle/refs/heads/main/style.json",
@@ -91,6 +94,20 @@
       return startColor.map((channel, index) => Math.round(channel + (endColor[index] - channel) * progress)).concat(95);
     }
 
+    function isInCentralTokyo([longitude, latitude]) {
+      const metersPerDegreeLatitude = 111320;
+      const longitudeDistance = (longitude - TOKYO_CENTER[0]) * metersPerDegreeLatitude * Math.cos(TOKYO_CENTER[1] * Math.PI / 180);
+      const latitudeDistance = (latitude - TOKYO_CENTER[1]) * metersPerDegreeLatitude;
+      return Math.hypot(longitudeDistance, latitudeDistance) <= CENTRAL_TOKYO_RADIUS_METERS;
+    }
+
+    function columnHeight(station) {
+      const baseHeight = Math.max(12, station.frequency * HEIGHT_PER_TRAIN_METERS);
+      return isInCentralTokyo(station.position)
+        ? baseHeight * CENTRAL_TOKYO_HEIGHT_MULTIPLIER
+        : baseHeight;
+    }
+
     function renderColumns() {
       if (!overlay) return;
       const minutes = Number(slider.value);
@@ -106,7 +123,8 @@
           radius,
           getPosition: d => d.position,
           // 高さだけが運行本数を表す。徒歩圏スライダーでは変化しない。
-          getElevation: d => Math.max(12, d.frequency * HEIGHT_PER_TRAIN_METERS),
+          // 都心部は混雑の見やすさのため控えめに強調する。
+          getElevation: d => columnHeight(d),
           getFillColor: d => columnColor(d.frequency),
           getLineColor: [120, 45, 20, 100],
           lineWidthMinPixels: 1,
