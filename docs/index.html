@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>鉄道駅 発着本数 3D</title>
+  <title>鉄道発着本数3D</title>
   <link href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css" rel="stylesheet">
   <style>
     html, body, #map { width: 100%; height: 100%; margin: 0; }
@@ -24,6 +24,8 @@
       background: linear-gradient(to right, #68bce8, #80c76a, #f1d54a, #ef8532, #c42e2e);
     }
     .legend-ticks { display: flex; justify-content: space-between; margin-top: 4px; color: #444; font-size: 11px; }
+    #source { margin: 12px 0 0; color: #666; font-size: 11px; line-height: 1.45; }
+    #source a { color: #2b6cb0; }
     #loading {
       position: absolute; z-index: 2; top: 50%; left: 50%; transform: translate(-50%, -50%);
       padding: 12px 18px; background: white; border-radius: 7px;
@@ -33,7 +35,7 @@
 </head>
 <body>
   <aside id="control">
-    <h1>鉄道駅 発着本数</h1>
+    <h1>鉄道発着本数 3D</h1>
     <div id="time">徒歩 10 分圏</div>
     <p id="distance">円柱の半径: 約 800 m</p>
     <input id="slider" type="range" min="1" max="30" value="10" step="1" aria-label="徒歩圏の時間（分）">
@@ -42,6 +44,7 @@
       <div class="legend-ramp"></div>
       <div class="legend-ticks"><span>0</span><span>250</span><span>500</span><span>750</span><span>1,000本+</span></div>
     </div>
+    <p id="source">出典: <a href="https://gtfs-gis.jp/railway_honsu/" target="_blank" rel="noopener noreferrer">全国鉄道運行本数データ公開ページ</a></p>
   </aside>
   <div id="loading">駅データを読み込んでいます…</div>
   <div id="map"></div>
@@ -51,10 +54,7 @@
   <script src="https://unpkg.com/deck.gl@9.0.38/dist.min.js"></script>
   <script>
     const WALKING_SPEED_METERS_PER_MINUTE = 80;
-    const HEIGHT_PER_TRAIN_METERS = 15;
-    const TOKYO_CENTER = [139.7671, 35.6812]; // 東京駅
-    const CENTRAL_TOKYO_RADIUS_METERS = 25000;
-    const CENTRAL_TOKYO_HEIGHT_MULTIPLIER = 1.25;
+    const HEIGHT_PER_TRAIN_METERS = 30;
     const map = new maplibregl.Map({
       container: "map",
       style: "https://raw.githubusercontent.com/mayuge/OpenSourceStyle/refs/heads/main/style.json",
@@ -94,20 +94,6 @@
       return startColor.map((channel, index) => Math.round(channel + (endColor[index] - channel) * progress)).concat(95);
     }
 
-    function isInCentralTokyo([longitude, latitude]) {
-      const metersPerDegreeLatitude = 111320;
-      const longitudeDistance = (longitude - TOKYO_CENTER[0]) * metersPerDegreeLatitude * Math.cos(TOKYO_CENTER[1] * Math.PI / 180);
-      const latitudeDistance = (latitude - TOKYO_CENTER[1]) * metersPerDegreeLatitude;
-      return Math.hypot(longitudeDistance, latitudeDistance) <= CENTRAL_TOKYO_RADIUS_METERS;
-    }
-
-    function columnHeight(station) {
-      const baseHeight = Math.max(12, station.frequency * HEIGHT_PER_TRAIN_METERS);
-      return isInCentralTokyo(station.position)
-        ? baseHeight * CENTRAL_TOKYO_HEIGHT_MULTIPLIER
-        : baseHeight;
-    }
-
     function renderColumns() {
       if (!overlay) return;
       const minutes = Number(slider.value);
@@ -123,8 +109,7 @@
           radius,
           getPosition: d => d.position,
           // 高さだけが運行本数を表す。徒歩圏スライダーでは変化しない。
-          // 都心部は混雑の見やすさのため控えめに強調する。
-          getElevation: d => columnHeight(d),
+          getElevation: d => Math.max(12, d.frequency * HEIGHT_PER_TRAIN_METERS),
           getFillColor: d => columnColor(d.frequency),
           getLineColor: [120, 45, 20, 100],
           lineWidthMinPixels: 1,
