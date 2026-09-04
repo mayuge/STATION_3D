@@ -109,14 +109,14 @@
           radius,
           getPosition: d => d.position,
           // ズームレベル12以上では円柱を平面として表示する。
-          getElevation: d => map.getZoom() >= 12 ? 0 : d.frequency,
-          getFillColor: d => columnColor(d.frequency*3),
+          getElevation: d => map.getZoom() >= 12 ? 0 : d.frequency*3,
+          getFillColor: d => columnColor(d.frequency),
           getLineColor: [120, 45, 20, 100],
           lineWidthMinPixels: 1,
           parameters: { depthTest: map.getZoom() < 12 },
           pickable: true,
           autoHighlight: true,
-          material: { ambient: 0.35, diffuse: 0.65, shininess: 5, specularColor: [255, 255, 255] }
+          material: { ambient: 0.35, diffuse: 0.65, shininess: 15, specularColor: [255, 255, 255] }
         })]
       });
     }
