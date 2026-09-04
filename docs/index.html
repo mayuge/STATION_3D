@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>鉄道駅 発着本数 3D</title>
+  <link href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css" rel="stylesheet">
+  <style>
+    html, body, #map { width: 100%; height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, "Noto Sans JP", sans-serif; }
+    #control {
+      position: absolute; z-index: 1; top: 20px; left: 20px; width: 270px;
+      padding: 16px 18px; border-radius: 10px; background: rgba(255, 255, 255, .94);
+      box-shadow: 0 3px 18px rgba(0, 0, 0, .24);
+    }
+    #control h1 { margin: 0 0 6px; font-size: 18px; }
+    #time { margin-bottom: 5px; font-size: 15px; font-weight: 700; }
+    #distance { margin: 0 0 12px; color: #555; font-size: 12px; line-height: 1.5; }
+    input[type="range"] { width: 100%; accent-color: #e4572e; }
+    #loading {
+      position: absolute; z-index: 2; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      padding: 12px 18px; background: white; border-radius: 7px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .2);
+    }
+  </style>
+</head>
+<body>
+  <aside id="control">
+    <h1>鉄道駅 発着本数</h1>
+    <div id="time">徒歩 10 分圏</div>
+    <p id="distance">円柱の半径: 約 800 m</p>
+    <input id="slider" type="range" min="1" max="30" value="10" step="1" aria-label="徒歩圏の時間（分）">
+  </aside>
+  <div id="loading">駅データを読み込んでいます…</div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
+  <!-- MapLibre に重ねる deck.gl。円柱の描画・半径指定は deck.gl が担う。 -->
+  <script src="https://unpkg.com/deck.gl@9.0.38/dist.min.js"></script>
+  <script>
+    const WALKING_SPEED_METERS_PER_MINUTE = 80;
+    const HEIGHT_PER_TRAIN_METERS = 6;
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://raw.githubusercontent.com/mayuge/OpenSourceStyle/refs/heads/main/style.json",
+      center: [139.807, 35.5493],
+      zoom: 9,
+      pitch: 55,
+      bearing: -12,
+      hash: true,
+      antialias: true
+    });
+    map.addControl(new maplibregl.NavigationControl(), "top-right");
+
+    let stations = [];
+    let overlay;
+    const slider = document.getElementById("slider");
+    const timeLabel = document.getElementById("time");
+    const distanceLabel = document.getElementById("distance");
+
+    function totalTrains(properties) {
+      return ["着数1", "発数1", "着数2", "発数2"]
+        .reduce((sum, key) => sum + (Number(properties[key]) || 0), 0);
+    }
+
+    function renderColumns() {
+      if (!overlay) return;
+      const minutes = Number(slider.value);
+      const radius = minutes * WALKING_SPEED_METERS_PER_MINUTE;
+      timeLabel.textContent = `徒歩 ${minutes} 分圏`;
+      distanceLabel.textContent = `円柱の半径: 約 ${radius.toLocaleString()} m`;
+      overlay.setProps({
+        layers: [new deck.ColumnLayer({
+          id: "train-frequency-columns",
+          data: stations,
+          diskResolution: 24,
+          extruded: true,
+          radius,
+          getPosition: d => d.position,
+          // 高さだけが運行本数を表す。徒歩圏スライダーでは変化しない。
+          getElevation: d => Math.max(12, d.frequency * HEIGHT_PER_TRAIN_METERS),
+          getFillColor: d => d.frequency > 300 ? [196, 46, 46, 210] : [239, 126, 50, 205],
+          getLineColor: [120, 45, 20, 220],
+          lineWidthMinPixels: 1,
+          pickable: true,
+          autoHighlight: true,
+          material: { ambient: 0.35, diffuse: 0.65, shininess: 28, specularColor: [255, 255, 255] }
+        })]
+      });
+    }
+
+    map.on("load", () => {
+      overlay = new deck.MapboxOverlay({
+        interleaved: true,
+        getTooltip: ({ object }) => object && ({
+          html: `<b>${object.name}</b><br>発着本数: ${object.frequency.toLocaleString()} 本`,
+          style: { backgroundColor: "#fff", color: "#222", fontSize: "12px" }
+        })
+      });
+      map.addControl(overlay);
+      renderColumns();
+    });
+
+    fetch("./unkohonsu2026_rosen_eki.geojson")
+      .then(response => {
+        if (!response.ok) throw new Error(`GeoJSON の読み込みに失敗しました (${response.status})`);
+        return response.json();
+      })
+      .then(data => {
+        stations = data.features
+          .filter(feature => feature.geometry?.type?.toLowerCase() === "point")
+          .map(feature => ({
+            position: feature.geometry.coordinates.map(Number),
+            name: feature.properties?.["駅名"] || "名称未設定の駅",
+            frequency: totalTrains(feature.properties || {})
+          }))
+          .filter(station => station.position.length >= 2 && station.position.every(Number.isFinite));
+        document.getElementById("loading").style.display = "none";
+        renderColumns();
+      })
+      .catch(error => {
+        console.error(error);
+        document.getElementById("loading").textContent = "駅データを読み込めませんでした";
+      });
+
+    slider.addEventListener("input", renderColumns);
+  </script>
+</body>
+</html>
