@@ -17,6 +17,13 @@
     #time { margin-bottom: 5px; font-size: 15px; font-weight: 700; }
     #distance { margin: 0 0 12px; color: #555; font-size: 12px; line-height: 1.5; }
     input[type="range"] { width: 100%; accent-color: #e4572e; }
+    #legend { margin-top: 14px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 12px; }
+    #legend-title { margin-bottom: 7px; font-weight: 700; }
+    .legend-ramp {
+      height: 12px; border: 1px solid rgba(80, 40, 20, .4); border-radius: 3px;
+      background: linear-gradient(to right, #68bce8, #80c76a, #f1d54a, #ef8532, #c42e2e);
+    }
+    .legend-ticks { display: flex; justify-content: space-between; margin-top: 4px; color: #444; font-size: 11px; }
     #loading {
       position: absolute; z-index: 2; top: 50%; left: 50%; transform: translate(-50%, -50%);
       padding: 12px 18px; background: white; border-radius: 7px;
@@ -30,6 +37,11 @@
     <div id="time">徒歩 10 分圏</div>
     <p id="distance">円柱の半径: 約 800 m</p>
     <input id="slider" type="range" min="1" max="30" value="10" step="1" aria-label="徒歩圏の時間（分）">
+    <div id="legend" aria-label="発着本数の凡例">
+      <div id="legend-title">発着本数（円柱の色）</div>
+      <div class="legend-ramp"></div>
+      <div class="legend-ticks"><span>0</span><span>250</span><span>500</span><span>750</span><span>1,000本+</span></div>
+    </div>
   </aside>
   <div id="loading">駅データを読み込んでいます…</div>
   <div id="map"></div>
@@ -63,6 +75,22 @@
         .reduce((sum, key) => sum + (Number(properties[key]) || 0), 0);
     }
 
+    function columnColor(frequency) {
+      const stops = [
+        [0, [104, 188, 232]],
+        [250, [128, 199, 106]],
+        [500, [241, 213, 74]],
+        [750, [239, 133, 50]],
+        [1000, [196, 46, 46]]
+      ];
+      const value = Math.min(Math.max(frequency, 0), 1000);
+      const upperIndex = stops.findIndex(([limit]) => value <= limit);
+      const [startValue, startColor] = stops[Math.max(upperIndex - 1, 0)];
+      const [endValue, endColor] = stops[upperIndex];
+      const progress = startValue === endValue ? 0 : (value - startValue) / (endValue - startValue);
+      return startColor.map((channel, index) => Math.round(channel + (endColor[index] - channel) * progress)).concat(95);
+    }
+
     function renderColumns() {
       if (!overlay) return;
       const minutes = Number(slider.value);
@@ -79,8 +107,8 @@
           getPosition: d => d.position,
           // 高さだけが運行本数を表す。徒歩圏スライダーでは変化しない。
           getElevation: d => Math.max(12, d.frequency * HEIGHT_PER_TRAIN_METERS),
-          getFillColor: d => d.frequency > 300 ? [196, 46, 46, 210] : [239, 126, 50, 205],
-          getLineColor: [120, 45, 20, 220],
+          getFillColor: d => columnColor(d.frequency),
+          getLineColor: [120, 45, 20, 100],
           lineWidthMinPixels: 1,
           pickable: true,
           autoHighlight: true,
