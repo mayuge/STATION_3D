@@ -81,12 +81,12 @@
     function columnColor(frequency) {
       const stops = [
         [0, [104, 188, 232]],
-        [250, [128, 199, 106]],
-        [500, [241, 213, 74]],
-        [750, [239, 133, 50]],
-        [1000, [196, 46, 46]]
+        [500, [128, 199, 106]],
+        [1000, [241, 213, 74]],
+        [1500, [239, 133, 50]],
+        [2000, [196, 46, 46]]
       ];
-      const value = Math.min(Math.max(frequency, 0), 1000);
+      const value = Math.min(Math.max(frequency, 0), 2000);
       const upperIndex = stops.findIndex(([limit]) => value <= limit);
       const [startValue, startColor] = stops[Math.max(upperIndex - 1, 0)];
       const [endValue, endColor] = stops[upperIndex];
@@ -113,9 +113,10 @@
           getFillColor: d => columnColor(d.frequency*3),
           getLineColor: [120, 45, 20, 100],
           lineWidthMinPixels: 1,
+          parameters: { depthTest: map.getZoom() < 12 },
           pickable: true,
           autoHighlight: true,
-          material: { ambient: 0.35, diffuse: 0.65, shininess: 28, specularColor: [255, 255, 255] }
+          material: { ambient: 0.35, diffuse: 0.65, shininess: 5, specularColor: [255, 255, 255] }
         })]
       });
     }
